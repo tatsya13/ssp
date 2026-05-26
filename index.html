@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Интерактивное задание: Карта ССП</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --text: #0f172a; --muted: #64748b; --bg: #f8fafc; --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
+    .app { max-width: 1400px; margin: 0 auto; }
+    
+    header { text-align: center; margin-bottom: 24px; padding: 20px; background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    h1 { font-size: 24px; margin-bottom: 8px; letter-spacing: -0.5px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+    .instructions { background: #f1f5f9; padding: 16px; border-radius: 8px; text-align: left; font-size: 13px; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+    
+    .workspace { display: grid; grid-template-columns: 280px 1fr; gap: 20px; margin-top: 20px; position: relative; }
+    
+    .card-pool { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-height: calc(100vh - 200px); overflow-y: auto; z-index: 10; }
+    .pool-title { font-weight: 700; font-size: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; }
+    .pool-count { background: #f1f5f9; padding: 4px 10px; border-radius: 20px; font-size: 12px; color: var(--muted); }
+    
+    .draggable-card { background: white; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; cursor: grab; font-size: 13px; transition: all 0.2s; user-select: none; position: relative; }
+    .draggable-card:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: #94a3b8; }
+    .draggable-card:active { cursor: grabbing; }
+    .draggable-card.dragging { opacity: 0.4; }
+    .draggable-card .card-text { line-height: 1.3; }
+    .draggable-card.placed { opacity: 0.3; pointer-events: none; }
+    
+    .canvas-area { display: flex; flex-direction: column; gap: 16px; position: relative; }
+    
+    .canvas-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; z-index: 1; }
+    
+    .drop-zone { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); min-height: 200px; transition: all 0.2s; border: 2px solid transparent; position: relative; }
+    .drop-zone.drag-over { background: #f8fafc; border-color: #cbd5e1; }
+    
+    .zone-header { font-weight: 700; font-size: 16px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .zone-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.4; }
+    
+    .cards-container { min-height: 120px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; padding: 12px; background: #fafafa; border-radius: 8px; border: 2px dashed #e2e8f0; transition: all 0.2s; }
+    .cards-container.drag-over { border-color: #94a3b8; background: #fff; }
+    
+    .placed-card { background: white; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; font-size: 12px; cursor: pointer; position: relative; display: flex; align-items: center; gap: 6px; max-width: 250px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .placed-card .remove-btn { position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    .placed-card:hover .remove-btn { display: flex; }
+    
+    .controls { display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap; z-index: 10; position: relative; }
+    .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; gap: 8px; }
+    .btn-primary { background: var(--text); color: white; }
+    .btn-primary:hover { background: #334155; transform: translateY(-2px); }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-warning:hover { background: #d97706; transform: translateY(-2px); }
+    .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { background: #f1f5f9; }
+    
+    .score-display { text-align: center; padding: 16px; background: white; border-radius: 12px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: none; z-index: 10; position: relative; }
+    .score-display.visible { display: block; }
+    .score-number { font-size: 48px; font-weight: 700; margin: 8px 0; }
+    .score-text { color: var(--muted); font-size: 14px; }
+    
+    .feedback { font-size: 13px; margin-top: 8px; padding: 8px; border-radius: 6px; }
+    .feedback.correct { background: #d1fae5; color: #065f46; }
+    .feedback.incorrect { background: #fee2e2; color: #991b1b; }
+    
+    .correct-answer-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .correct-answer-overlay.visible { display: flex; }
+    .answer-modal { background: white; border-radius: 16px; padding: 32px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative; }
+    .answer-modal h2 { margin-bottom: 20px; font-size: 20px; }
+    .answer-section { margin-bottom: 16px; padding: 12px; border-radius: 8px; }
+    .answer-section h3 { font-size: 14px; margin-bottom: 8px; color: white; padding: 6px 10px; border-radius: 4px; }
+    .answer-card { background: white; border: 1px solid var(--border); border-radius: 4px; padding: 8px; margin-bottom: 6px; font-size: 12px; }
+    .close-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--muted); }
+    
+    .hint-text { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; font-style: italic; }
+    
+    @media (max-width: 1024px) {
+      .workspace { grid-template-columns: 1fr; }
+      .card-pool { max-height: 250px; }
+      .canvas-row { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .card-pool, .controls, .score-display { display: none; }
+      .workspace { grid-template-columns: 1fr; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🎯 Интерактивное задание: Карта ССП</h1>
+      <p class="subtitle">Дисциплина: Управление физкультурно-спортивными организациями | Тема 4</p>
+      <div class="instructions">
+        <strong>📋 Задание:</strong> Перетащите карточки с показателями в соответствующие блоки Сбалансированной системы показателей.
+        <br><br>
+        <strong>⚠️ Важно:</strong> Карточки перемешаны и не содержат кодов — опирайтесь на знание структуры ССП. Нажмите «Проверить» для оценки.
+      </div>
+    </header>
+
+    <div class="workspace">
+      <div class="card-pool">
+        <div class="pool-title">
+          📦 Банк показателей
+          <span class="pool-count" id="poolCount">18 карточек</span>
+        </div>
+        <div id="cardPool"></div>
+        <p class="hint-text">Перетащите карточки в блоки →</p>
+      </div>
+
+      <div class="canvas-area">
+        <div class="canvas-row">
+          <div class="drop-zone" data-zone="personnel">
+            <div class="zone-header">📚 ОБУЧЕНИЕ И РАЗВИТИЕ <span id="persCount">0/5</span></div>
+            <div class="zone-desc">Квалификация кадров, технологии, вложения в развитие, инновационность</div>
+            <div class="cards-container" data-zone="personnel" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+          </div>
+          <div class="drop-zone" data-zone="processes">
+            <div class="zone-header">⚙️ ВНУТРЕННИЕ ПРОЦЕССЫ <span id="procCount">0/6</span></div>
+            <div class="zone-desc">Эффективность процессов, качество тренировок, инновации, отчётность</div>
+            <div class="cards-container" data-zone="processes" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+          </div>
+        </div>
+        <div class="canvas-row">
+          <div class="drop-zone" data-zone="clients">
+            <div class="zone-header"> КЛИЕНТЫ / СПОРТСМЕНЫ <span id="cliCount">0/5</span></div>
+            <div class="zone-desc">Удовлетворённость, удержание, доля рынка, лояльность, личный план продаж</div>
+            <div class="cards-container" data-zone="clients" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+          </div>
+          <div class="drop-zone" data-zone="finance">
+            <div class="zone-header">💰 ФИНАНСЫ <span id="finCount">0/3</span></div>
+            <div class="zone-desc">Рентабельность, внебюджетные доходы, бюджет, объёмные показатели</div>
+            <div class="cards-container" data-zone="finance" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+          </div>
+        </div>
+        
+        <div class="controls">
+          <button class="btn btn-primary" onclick="checkAnswer()">✅ Проверить</button>
+          <button class="btn btn-warning" id="showAnswerBtn" style="display: none;" onclick="showCorrectAnswer()">️ Показать правильный вариант</button>
+          <button class="btn btn-secondary" onclick="window.print()">️ Печать</button>
+        </div>
+
+        <div class="score-display" id="scoreDisplay">
+          <div class="score-text">Ваш результат</div>
+          <div class="score-number" id="scoreNumber">0/18</div>
+          <div class="score-text" id="scoreText"></div>
+          <div id="feedbackContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="correct-answer-overlay" id="answerOverlay">
+    <div class="answer-modal">
+      <button class="close-btn" onclick="closeAnswerModal()">✕</button>
+      <h2>✅ Правильный вариант карты ССП</h2>
+      <div id="answerContent"></div>
+      <p style="text-align: center; margin-top: 20px; color: var(--muted); font-size: 13px;">
+        <strong>Логика ССП:</strong> Инвестиции в обучение персонала → совершенствование процессов → рост удовлетворённости клиентов → увеличение доходов → реинвестирование в кадры.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Карточки без кодов, перемешанные. 
+    // Внимание: "Выполнение личного плана..." перенесено в clients (zone: 'clients')
+    const cards = [
+      { id: 'c1', text: 'Индекс удовлетворённости спортсменов и родителей качеством услуг', zone: 'clients' },
+      { id: 'c2', text: 'Доля внебюджетных доходов в общей структуре поступлений', zone: 'finance' },
+      { id: 'c3', text: 'Количество освоенных новых профессиональных компетенций за отчётный период', zone: 'personnel' },
+      { id: 'c4', text: 'Количество спортивных мероприятий, проведённых в соответствии с календарным планом', zone: 'processes' },
+      { id: 'c5', text: 'Процент удержания закреплённых спортсменов в возрастной группе', zone: 'clients' },
+      { id: 'c6', text: 'Соблюдение графика подготовки объекта к мероприятию', zone: 'processes' },
+      { id: 'c7', text: 'Доля тренеров с высшей квалификационной категорией в штате', zone: 'personnel' },
+      { id: 'c8', text: 'Выполнение бюджета подразделения по статьям расходов', zone: 'finance' },
+      { id: 'c9', text: 'Своевременность подготовки отчётности по итогам спортивных мероприятий', zone: 'processes' },
+      { id: 'c10', text: 'Индекс лояльности партнёров и спонсоров проекта', zone: 'clients' },
+      { id: 'c11', text: 'Количество инновационных методик, внедрённых в тренировочный процесс', zone: 'processes' },
+      { id: 'c12', text: '% сотрудников подразделения, прошедших повышение квалификации за год', zone: 'personnel' },
+      { id: 'c13', text: 'Доля тренеров проектной группы, освоивших цифровые инструменты', zone: 'personnel' },
+      { id: 'c14', text: 'Процент удержания клиентов (спортсменов) в филиале/отделении', zone: 'clients' },
+      { id: 'c15', text: 'Соблюдение регламента ведения журналов учёта тренировочной нагрузки', zone: 'processes' },
+      { id: 'c16', text: 'Выполнение личного плана по привлечению платных клиентов', zone: 'clients' }, // Moved to clients
+      { id: 'c17', text: 'Количество новых методик, разработанных командой за отчётный период', zone: 'personnel' },
+      { id: 'c18', text: 'Своевременность подачи заявок на инвентарь и экипировку', zone: 'processes' }
+    ];
+
+    let draggedCard = null;
+    let placedCards = {};
+
+    function init() {
+      const pool = document.getElementById('cardPool');
+      cards.forEach(card => {
+        const el = document.createElement('div');
+        el.className = `draggable-card`;
+        el.draggable = true;
+        el.id = card.id;
+        el.dataset.zone = card.zone;
+        el.innerHTML = `<div class="card-text">${card.text}</div>`;
+        
+        el.addEventListener('dragstart', dragStart);
+        el.addEventListener('dragend', dragEnd);
+        el.addEventListener('touchstart', touchStart, { passive: false });
+        el.addEventListener('touchmove', touchMove, { passive: false });
+        el.addEventListener('touchend', touchEnd);
+        
+        pool.appendChild(el);
+      });
+      updateCounts();
+    }
+
+    function dragStart(e) {
+      draggedCard = e.target.closest('.draggable-card');
+      draggedCard.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedCard.id);
+    }
+
+    function dragEnd(e) {
+      if (draggedCard) {
+        draggedCard.classList.remove('dragging');
+        draggedCard = null;
+      }
+    }
+
+    function allowDrop(e) {
+      e.preventDefault();
+      const container = e.target.closest('.cards-container');
+      if (container) container.classList.add('drag-over');
+    }
+
+    function drop(e) {
+      e.preventDefault();
+      const container = e.target.closest('.cards-container');
+      if (!container) return;
+      container.classList.remove('drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      const card = cards.find(c => c.id === cardId);
+      if (card) placeCard(card, container);
+    }
+
+    function placeCard(card, container) {
+      if (placedCards[card.id]) {
+        const prevContainer = placedCards[card.id].container;
+        const prevCard = prevContainer.querySelector(`[data-card-id="${card.id}"]`);
+        if (prevCard) prevCard.remove();
+      }
+      
+      placedCards[card.id] = { card, container };
+      
+      const placedEl = document.createElement('div');
+      placedEl.className = `placed-card`;
+      placedEl.dataset.cardId = card.id;
+      placedEl.innerHTML = `
+        <div><div class="card-text">${card.text.substring(0, 50)}...</div></div>
+        <button class="remove-btn" onclick="removeCard('${card.id}')"></button>
+      `;
+      
+      container.appendChild(placedEl);
+      document.getElementById(card.id).classList.add('placed');
+      updateCounts();
+    }
+
+    function removeCard(cardId) {
+      if (placedCards[cardId]) {
+        placedCards[cardId].container.querySelector(`[data-card-id="${cardId}"]`)?.remove();
+        document.getElementById(cardId).classList.remove('placed');
+        delete placedCards[cardId];
+        updateCounts();
+      }
+    }
+
+    function updateCounts() {
+      const counts = { finance: 0, clients: 0, processes: 0, personnel: 0 };
+      Object.values(placedCards).forEach(({ card }) => { counts[card.zone]++; });
+      
+      document.getElementById('finCount').textContent = `${counts.finance}/3`;
+      document.getElementById('cliCount').textContent = `${counts.clients}/5`; // Updated count to 5
+      document.getElementById('procCount').textContent = `${counts.processes}/6`;
+      document.getElementById('persCount').textContent = `${counts.personnel}/5`;
+      
+      const placedCount = Object.keys(placedCards).length;
+      document.getElementById('poolCount').textContent = `${cards.length - placedCount} карточек`;
+    }
+
+    function touchStart(e) {
+      e.preventDefault();
+      draggedCard = e.target.closest('.draggable-card');
+      draggedCard.classList.add('dragging');
+    }
+    function touchMove(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+      const container = elementBelow?.closest('.cards-container');
+      document.querySelectorAll('.cards-container').forEach(c => c.classList.remove('drag-over'));
+      if (container) container.classList.add('drag-over');
+    }
+    function touchEnd(e) {
+      e.preventDefault();
+      if (!draggedCard) return;
+      const touch = e.changedTouches[0];
+      const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+      const container = elementBelow?.closest('.cards-container');
+      if (container) {
+        const cardId = draggedCard.id;
+        const card = cards.find(c => c.id === cardId);
+        if (card) placeCard(card, container);
+      }
+      draggedCard.classList.remove('dragging');
+      draggedCard = null;
+      updateCounts();
+    }
+
+    function checkAnswer() {
+      let correct = 0;
+      const total = cards.length;
+      const feedback = [];
+      
+      Object.entries(placedCards).forEach(([cardId, { card, container }]) => {
+        const zone = container.dataset.zone;
+        if (card.zone === zone) correct++;
+        else feedback.push({ text: card.text.substring(0, 30) + '...', correct: getZoneName(card.zone), placed: getZoneName(zone) });
+      });
+      
+      const unplaced = cards.filter(c => !placedCards[c.id]);
+      if (unplaced.length > 0) feedback.push({ type: 'unplaced', count: unplaced.length });
+      
+      displayScore(correct, total, feedback);
+      
+      document.getElementById('showAnswerBtn').style.display = 'flex';
+    }
+
+    function getZoneName(zone) {
+      const names = { finance: 'Финансы', clients: 'Клиенты', processes: 'Процессы', personnel: 'Обучение' };
+      return names[zone];
+    }
+
+    function displayScore(correct, total, feedback) {
+      const display = document.getElementById('scoreDisplay');
+      display.classList.add('visible');
+      document.getElementById('scoreNumber').textContent = `${correct}/${total}`;
+      
+      const percentage = Math.round((correct / total) * 100);
+      let text = percentage >= 90 ? '🎉 Отлично!' : percentage >= 70 ? '👍 Хорошо!' : '❌ Нужно повторить материал.';
+      document.getElementById('scoreText').textContent = text;
+      
+      const container = document.getElementById('feedbackContainer');
+      container.innerHTML = '';
+      feedback.forEach(item => {
+        const div = document.createElement('div');
+        div.className = item.type === 'unplaced' ? 'feedback incorrect' : 'feedback incorrect';
+        div.textContent = item.type === 'unplaced' ? `⚠️ Осталось разместить ${item.count} карточек` : `«${item.text}» — размещено в «${item.placed}», правильно: «${item.correct}»`;
+        container.appendChild(div);
+      });
+      if (correct === total) {
+        const div = document.createElement('div');
+        div.className = 'feedback correct';
+        div.textContent = '✅ Все карточки размещены правильно!';
+        container.appendChild(div);
+      }
+    }
+
+    function showCorrectAnswer() {
+      const overlay = document.getElementById('answerOverlay');
+      const content = document.getElementById('answerContent');
+      
+      const zones = {
+        personnel: { name: '📚 ОБУЧЕНИЕ И РАЗВИТИЕ', color: '#ef4444', cards: [] },
+        processes: { name: '⚙️ ВНУТРЕННИЕ ПРОЦЕССЫ', color: '#eab308', cards: [] },
+        clients: { name: '👥 КЛИЕНТЫ / СПОРТСМЕНЫ', color: '#22c55e', cards: [] },
+        finance: { name: '💰 ФИНАНСЫ', color: '#3b82f6', cards: [] }
+      };
+      
+      cards.forEach(card => { zones[card.zone].cards.push(card); });
+      
+      let html = '';
+      Object.values(zones).forEach(zone => {
+        html += `
+          <div class="answer-section" style="background: ${zone.color}20; border-left: 4px solid ${zone.color};">
+            <h3 style="background: ${zone.color};">${zone.name}</h3>
+            ${zone.cards.map(card => `<div class="answer-card">${card.text}</div>`).join('')}
+          </div>
+        `;
+      });
+      
+      content.innerHTML = html;
+      overlay.classList.add('visible');
+    }
+
+    function closeAnswerModal() {
+      document.getElementById('answerOverlay').classList.remove('visible');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+    document.getElementById('answerOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeAnswerModal();
+    });
+  </script>
+</body>
+</html>
+
